@@ -1,15 +1,38 @@
 const express = require("express");
-const { connectToMongoDB } = require("./connect");
-const urlRoute = require("./routes/url");
-const URL = require("./models/url");
 const path = require('path');
+const cookieParser = require('cookie-parser');
+const { connectToMongoDB } = require("./connect");
+const {restrictToLoggedinUserOnly} = require('./middlewares/auth');
+
+const URL = require("./models/url");
+
+
+
+const urlRoute = require("./routes/url");
 const staticRoute = require('./routes/staticRoueter');
+const userRoute = require('./routes/user');
+
 const app = express();
+const PORT = 8001;
+
+connectToMongoDB("mongodb://127.0.0.1:27017/short-url")
+.then(() => console.log("MongoDB connected!"))
+
+
+app.set("view engine", "ejs");
+app.set('views', path.resolve("./views"));
 
 app.use(express.json());
 app.use(express.urlencoded({extended: false}));
+app.use(cookieParser());
 
-app.use("/", staticRoute);
+
+app.use("/url", restrictToLoggedinUserOnly ,urlRoute);
+app.use("/user", userRoute);
+app.use("/", restrictToLoggedinUserOnly, staticRoute);
+
+
+
 app.get("/url/:shortId", async (req, res) => {
     const shortId = req.params.shortId;
     const entry = await URL.findOneAndUpdate({
@@ -26,12 +49,9 @@ app.get("/url/:shortId", async (req, res) => {
 // }
     res.redirect(entry.redirectURL);
 })
-const PORT = 8000;
-connectToMongoDB("mongodb://127.0.0.1:27017/short-url")
-.then(() => console.log("MongoDB connected!"))
-app.use("/url", urlRoute);
 
-app.set("view engine", "ejs");
-app.set('views', path.resolve("./views"));
+
+
+
 
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
